@@ -1,0 +1,23 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'bash'
+stack: 'systems'
+layer: 'library'
+
+tasks:
+  build:
+    command: 'anchor build'
+    inputs:
+      - 'programs/**/*.rs'
+      - 'programs/**/Cargo.toml'
+      - 'Anchor.toml'
+    outputs:
+      - 'target/idl'
+      - 'target/deploy'
+
+  test:
+    command: 'anchor test --skip-local-validator'
+    inputs:
+      - 'programs/**/*.rs'
+      - 'tests/**/*'
+      - 'Anchor.toml'
