@@ -8,7 +8,7 @@ pub const SEED_VAULT: &[u8] = b"vault";
 
 pub const MAX_HOST_FEE_BPS: u16 = 25; // 0.25% protocol ceiling
 pub const ANTI_GRIEFING_BOND_LAMPORTS: u64 = 10_000_000; // 0.01 SOL refundable bond
-pub const MIN_DURATION_SECONDS: i64 = 900; // 15 minutes minimum
+pub const MIN_DURATION_SECONDS: i64 = 3_600; // 1 hour minimum (must exceed W=1800s + payout SLA)
 pub const MAX_DURATION_SECONDS: i64 = 604_800; // 7 days maximum
 pub const SETTLEMENT_WINDOW_SECONDS: i64 = 1_800; // 30-minute challenge window
 pub const DISPUTE_TIMEOUT_SECONDS: i64 = 1_209_600; // 14-day failsafe dispute timeout
