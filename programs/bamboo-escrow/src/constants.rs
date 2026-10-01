@@ -6,8 +6,8 @@ pub const SEED_ORDER: &[u8] = b"order";
 /// PDA seed prefix for Token Vault accounts
 pub const SEED_VAULT: &[u8] = b"vault";
 
-/// Maximum allowable host fee ceiling in basis points: 25 bps (0.25%)
-pub const MAX_HOST_FEE_BPS: u16 = 25;
+/// Maximum allowable host fee ceiling in basis points: 100 bps (1.00%)
+pub const MAX_HOST_FEE_BPS: u16 = 100;
 
 /// Basis points denominator (100.00% = 10,000 bps)
 pub const BPS_DENOMINATOR: u128 = 10_000;
