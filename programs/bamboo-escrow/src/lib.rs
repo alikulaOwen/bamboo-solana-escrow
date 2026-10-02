@@ -6,7 +6,7 @@ declare_id!("BamEscrow1111111111111111111111111111111111");
 pub const SEED_ORDER: &[u8] = b"order";
 pub const SEED_VAULT: &[u8] = b"vault";
 
-pub const MAX_HOST_FEE_BPS: u16 = 25; // 0.25% protocol ceiling
+pub const MAX_HOST_FEE_BPS: u16 = 100; // 1.00% protocol ceiling
 pub const ANTI_GRIEFING_BOND_LAMPORTS: u64 = 10_000_000; // 0.01 SOL refundable bond
 pub const MIN_DURATION_SECONDS: i64 = 3_600; // 1 hour minimum (must exceed W=1800s + payout SLA)
 pub const MAX_DURATION_SECONDS: i64 = 604_800; // 7 days maximum
@@ -255,6 +255,20 @@ pub mod bamboo_escrow {
         Ok(())
     }
 
+    /// Maker withdraws a previously filed dispute, returning the order to SettlementRequested.
+    pub fn withdraw_dispute(ctx: Context<WithdrawDispute>) -> Result<()> {
+        let order = &mut ctx.accounts.order_state;
+        require!(order.status == EscrowStatus::Disputed, BambooError::InvalidStatus);
+
+        order.status = EscrowStatus::SettlementRequested;
+
+        emit!(DisputeWithdrawnEvent {
+            order_id: order.order_id,
+        });
+
+        Ok(())
+    }
+
     /// 2-of-3 Mediator Resolution: Resolves a disputed order in favor of Relayer or Maker.
     /// Requires signatures from 2 of [Maker, Relayer, Mediator].
     pub fn resolve_dispute_multisig(
@@ -452,7 +466,7 @@ pub struct RequestSettlement<'info> {
 
 #[derive(Accounts)]
 pub struct Finalize<'info> {
-    pub relayer: Signer<'info>,
+    pub caller: Signer<'info>,
 
     /// CHECK: Account receives rent and micro-bond refund
     #[account(mut, address = order_state.maker)]
@@ -460,7 +474,6 @@ pub struct Finalize<'info> {
 
     #[account(
         mut,
-        has_one = assigned_relayer @ BambooError::UnauthorizedRelayer,
         close = maker
     )]
     pub order_state: Account<'info, OrderAccount>,
@@ -474,6 +487,7 @@ pub struct Finalize<'info> {
 
     #[account(
         mut,
+        constraint = relayer_token_account.owner == order_state.assigned_relayer @ BambooError::UnauthorizedRelayer,
         constraint = relayer_token_account.mint == order_state.token_mint
     )]
     pub relayer_token_account: Account<'info, TokenAccount>,
@@ -484,7 +498,6 @@ pub struct Finalize<'info> {
     )]
     pub fee_treasury_token_account: Account<'info, TokenAccount>,
 
-    pub assigned_relayer: AccountInfo<'info>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -513,6 +526,17 @@ pub struct RaiseDispute<'info> {
     pub maker_token_account: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawDispute<'info> {
+    pub maker: Signer<'info>,
+
+    #[account(
+        mut,
+        has_one = maker @ BambooError::UnauthorizedMaker
+    )]
+    pub order_state: Account<'info, OrderAccount>,
 }
 
 #[derive(Accounts)]
@@ -684,15 +708,20 @@ pub struct DisputeResolvedEvent {
 }
 
 #[event]
+pub struct DisputeWithdrawnEvent {
+    pub order_id: [u8; 32],
+}
+
+#[event]
 pub struct OrderRefundedEvent {
     pub order_id: [u8; 32],
 }
 
 #[error_code]
 pub enum BambooError {
-    #[msg("Host fee exceeds protocol ceiling (25 bps)")]
+    #[msg("Host fee exceeds protocol ceiling (100 bps)")]
     HostFeeExceedsCeiling,
-    #[msg("Order lock duration must be between 15m and 7d")]
+    #[msg("Order lock duration must be between 1h and 7d")]
     InvalidDuration,
     #[msg("Amount must be greater than zero")]
     InvalidAmount,
@@ -716,4 +745,27 @@ pub enum BambooError {
     TimelockActive,
     #[msg("Arithmetic overflow")]
     MathOverflow,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fee_ceiling_boundary() {
+        assert_eq!(MAX_HOST_FEE_BPS, 100);
+        let valid_fee: u16 = 100;
+        let invalid_fee: u16 = 101;
+        assert!(valid_fee <= MAX_HOST_FEE_BPS);
+        assert!(invalid_fee > MAX_HOST_FEE_BPS);
+    }
+
+    #[test]
+    fn test_duration_boundary() {
+        assert_eq!(MIN_DURATION_SECONDS, 3_600);
+        let valid_duration: i64 = 3_600;
+        let invalid_duration: i64 = 3_599;
+        assert!(valid_duration >= MIN_DURATION_SECONDS);
+        assert!(invalid_duration < MIN_DURATION_SECONDS);
+    }
 }
